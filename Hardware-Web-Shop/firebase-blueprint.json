@@ -1,0 +1,105 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "A product category in the shop.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the category." },
+        "description": { "type": "string", "description": "A brief description of the category." },
+        "image": { "type": "string", "description": "The URL of the category image." }
+      },
+      "required": ["name", "description", "image"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A hardware product available for sale.",
+      "type": "object",
+      "properties": {
+        "category_id": { "type": "string", "description": "The ID of the category this product belongs to." },
+        "name": { "type": "string", "description": "The name of the product." },
+        "description": { "type": "string", "description": "A detailed description of the product." },
+        "price": { "type": "number", "description": "The price of the product." },
+        "stock": { "type": "integer", "description": "The current stock level." },
+        "image": { "type": "string", "description": "The URL of the product image." },
+        "brand": { "type": "string", "description": "The brand of the product." }
+      },
+      "required": ["category_id", "name", "description", "price", "stock", "image", "brand"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A registered user of the shop.",
+      "type": "object",
+      "properties": {
+        "firstname": { "type": "string", "description": "The user's first name." },
+        "lastname": { "type": "string", "description": "The user's last name." },
+        "email": { "type": "string", "format": "email", "description": "The user's email address." },
+        "address": { "type": "string", "description": "The user's street address." },
+        "city": { "type": "string", "description": "The user's city." },
+        "postal_code": { "type": "string", "description": "The user's postal code." },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "The user's role." }
+      },
+      "required": ["firstname", "lastname", "email", "role"]
+    },
+    "CartItem": {
+      "title": "CartItem",
+      "description": "An item in a user's shopping cart.",
+      "type": "object",
+      "properties": {
+        "product_id": { "type": "string", "description": "The ID of the product." },
+        "quantity": { "type": "integer", "description": "The quantity of the product." }
+      },
+      "required": ["product_id", "quantity"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A completed order.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "description": "The ID of the user who placed the order." },
+        "order_date": { "type": "string", "format": "date-time", "description": "The date and time the order was placed." },
+        "total_amount": { "type": "number", "description": "The total amount of the order." },
+        "payment_method": { "type": "string", "description": "The payment method used." },
+        "status": { "type": "string", "enum": ["pending", "shipped", "delivered", "cancelled"], "description": "The current status of the order." }
+      },
+      "required": ["user_id", "order_date", "total_amount", "payment_method", "status"]
+    },
+    "OrderItem": {
+      "title": "OrderItem",
+      "description": "An item within an order.",
+      "type": "object",
+      "properties": {
+        "product_id": { "type": "string", "description": "The ID of the product." },
+        "quantity": { "type": "integer", "description": "The quantity of the product." },
+        "single_price": { "type": "number", "description": "The price of a single unit at the time of purchase." }
+      },
+      "required": ["product_id", "quantity", "single_price"]
+    }
+  },
+  "firestore": {
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection of product categories."
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of all products."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user profiles."
+    },
+    "/users/{userId}/cart/{cartItemId}": {
+      "schema": "CartItem",
+      "description": "Subcollection of items in a user's cart."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of all orders."
+    },
+    "/orders/{orderId}/items/{orderItemId}": {
+      "schema": "OrderItem",
+      "description": "Subcollection of items in an order."
+    }
+  }
+}

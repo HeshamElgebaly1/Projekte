@@ -1,0 +1,197 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: categories
+    // Fields:
+    //   - name: string (required)
+    //   - description: string (required)
+    //   - image: string (required)
+    //
+    // Collection: products
+    // Fields:
+    //   - category_id: string (required)
+    //   - name: string (required)
+    //   - description: string (required)
+    //   - price: number (required)
+    //   - stock: int (required)
+    //   - image: string (required)
+    //   - brand: string (required)
+    //
+    // Collection: users
+    // Fields:
+    //   - firstname: string (required)
+    //   - lastname: string (required)
+    //   - email: string (required, email format)
+    //   - address: string (optional)
+    //   - city: string (optional)
+    //   - postal_code: string (optional)
+    //   - role: string (required, 'user' or 'admin')
+    //
+    // Collection: orders
+    // Fields:
+    //   - user_id: string (required)
+    //   - order_date: timestamp (required)
+    //   - total_amount: number (required)
+    //   - payment_method: string (required)
+    //   - status: string (required, 'pending', 'shipped', 'delivered', 'cancelled')
+    //
+    // Collection: orders/{orderId}/items
+    // Fields:
+    //   - product_id: string (required)
+    //   - quantity: int (required)
+    //   - single_price: number (required)
+    //
+    // Collection: users/{userId}/cart
+    // Fields:
+    //   - product_id: string (required)
+    //   - quantity: int (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "heshamelgebaly0108@gmail.com" ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidString(field, min, max) {
+      return request.resource.data[field] is string &&
+             request.resource.data[field].size() >= min &&
+             request.resource.data[field].size() <= max;
+    }
+
+    function isValidNumber(field, min) {
+      return request.resource.data[field] is number && request.resource.data[field] >= min;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidCategory() {
+      return hasRequiredFields(['name', 'description', 'image']) &&
+             hasOnlyAllowedFields(['name', 'description', 'image', 'created_at']) &&
+             isValidString('name', 1, 100) &&
+             isValidString('description', 1, 500) &&
+             isValidString('image', 1, 1000);
+    }
+
+    function isValidProduct() {
+      return hasRequiredFields(['category_id', 'name', 'description', 'price', 'stock', 'image', 'brand']) &&
+             hasOnlyAllowedFields(['category_id', 'name', 'description', 'price', 'stock', 'image', 'brand', 'created_at']) &&
+             isValidString('category_id', 1, 100) &&
+             isValidString('name', 1, 200) &&
+             isValidString('description', 1, 2000) &&
+             isValidNumber('price', 0) &&
+             request.resource.data.stock is int && request.resource.data.stock >= 0 &&
+             isValidString('image', 1, 1000) &&
+             isValidString('brand', 1, 100);
+    }
+
+    function isValidUser() {
+      return hasRequiredFields(['firstname', 'lastname', 'email', 'role']) &&
+             hasOnlyAllowedFields(['firstname', 'lastname', 'email', 'address', 'city', 'postal_code', 'role']) &&
+             isValidString('firstname', 1, 50) &&
+             isValidString('lastname', 1, 50) &&
+             isValidEmail(request.resource.data.email) &&
+             request.resource.data.role in ['user', 'admin'];
+    }
+
+    function isValidOrder() {
+      return hasRequiredFields(['user_id', 'order_date', 'total_amount', 'payment_method', 'status']) &&
+             hasOnlyAllowedFields(['user_id', 'order_date', 'total_amount', 'payment_method', 'status']) &&
+             request.resource.data.user_id == request.auth.uid &&
+             request.resource.data.order_date is timestamp &&
+             isValidNumber('total_amount', 0) &&
+             isValidString('payment_method', 1, 50) &&
+             request.resource.data.status in ['pending', 'shipped', 'delivered', 'cancelled'];
+    }
+
+    function isValidOrderItem() {
+      return hasRequiredFields(['product_id', 'quantity', 'single_price']) &&
+             hasOnlyAllowedFields(['product_id', 'quantity', 'single_price']) &&
+             isValidString('product_id', 1, 100) &&
+             request.resource.data.quantity is int && request.resource.data.quantity > 0 &&
+             isValidNumber('single_price', 0);
+    }
+
+    function isValidCartItem() {
+      return hasRequiredFields(['product_id', 'quantity']) &&
+             hasOnlyAllowedFields(['product_id', 'quantity']) &&
+             isValidString('product_id', 1, 100) &&
+             request.resource.data.quantity is int && request.resource.data.quantity > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidCategory();
+      allow delete: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidProduct();
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser() && request.resource.data.role == 'user';
+      allow update: if (isOwner(userId) && isValidUser() && request.resource.data.role == resource.data.role) || isAdmin();
+    }
+
+    match /users/{userId}/cart/{cartItemId} {
+      allow read, write: if isOwner(userId);
+      allow create, update: if isValidCartItem();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidOrder();
+      allow update: if isAdmin();
+    }
+
+    match /orders/{orderId}/items/{orderItemId} {
+      allow read: if isAuthenticated() && (get(/databases/$(database)/documents/orders/$(orderId)).data.user_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidOrderItem();
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
